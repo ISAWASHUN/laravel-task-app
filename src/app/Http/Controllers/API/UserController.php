@@ -24,15 +24,14 @@ class UserController extends Controller
         $user = User::create([
             'name' => $fields['name'],
             'email' => $fields['email'],
-            'password' => Hash::make($fields['password'])
+            'password' => Hash::make($fields['password']),
         ]);
 
         $response = [
             'success' => true,
-            'message' => 'User registered successfully',
+            'message' => "Registration successful."
         ];
-
-        return $response->json($response, 201);
+        return response()->json($response, 201);
     }
 
     public function login(Request $request)
@@ -45,17 +44,19 @@ class UserController extends Controller
         $user = User::where('email', $credentials['email'])->first();
 
         if (!$user || !Hash::check($credentials['password'], $user->password)) {
+
             throw ValidationException::withMessages([
-                'email' => ['The provided credentials are incorrect'],
+                'email' => ['The provided credentials are incorrect.'],
             ]);
         }
 
-        $token = $user->createToken($user->email)->plainTextToken;
+        $token = $user->createToken('authToken')->plainTextToken;
 
         return response()->json([
             'success' => true,
-            'message' => 'User logged in successfully',
-            'token' => $token,
+            'user' => $user,
+            'access_token' => $token,
+            'message' => 'Login successful',
         ], Response::HTTP_OK);
     }
 }
