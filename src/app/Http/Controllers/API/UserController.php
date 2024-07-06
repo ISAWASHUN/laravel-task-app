@@ -5,58 +5,58 @@ namespace App\Http\Controllers\API;
 use App\Models\User;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
-use Illuminate\Support\Facades\RateLimiter;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\ValidationException;
-use Laravel\Sanctum\PersonalAccessToken;
 use Symfony\Component\HttpFoundation\Response;
 
 class UserController extends Controller
 {
     public function register(Request $request)
     {
-        $fields = $request->validate([
+        $validated = $request->validate([
             'name' => 'required|string',
             'email' => 'required|email|unique:users,email',
             'password' => 'required',
         ]);
 
         $user = User::create([
-            'name' => $fields['name'],
-            'email' => $fields['email'],
-            'password' => Hash::make($fields['password']),
+            'name' => $validated['name'],
+            'email' => $validated['email'],
+            'password' => Hash::make($validated['password']),
         ]);
 
-        $response = [
-            'success' => true,
-            'message' => "Registration successful."
-        ];
-        return response()->json($response, 201);
+        return response()->json(['user' => $user]);
     }
 
     public function login(Request $request)
-    {
+{
+    try {
         $credentials = $request->validate([
             'email' => 'required|email',
             'password' => 'required',
         ]);
 
-        $user = User::where('email', $credentials['email'])->first();
-
-        if (!$user || !Hash::check($credentials['password'], $user->password)) {
-
-            throw ValidationException::withMessages([
-                'email' => ['The provided credentials are incorrect.'],
-            ]);
+        if (!Auth::attempt($credentials)) {
+            return response()->json(['message' => 'Unauthorized'], 401);
         }
 
-        $token = $user->createToken('authToken')->plainTextToken;
+        $request->session()->regenerate();
 
-        return response()->json([
-            'success' => true,
-            'user' => $user,
-            'access_token' => $token,
-            'message' => 'Login successful',
-        ], Response::HTTP_OK);
+        return response()->json(['user' => Auth::user()]);
+    } catch (\Exception $e) {
+        Log::error('Login error: ' . $e->getMessage());
+        return response()->json(['message' => 'Error: ' . $e->getMessage()], 500);
+    }
+}
+
+    public function logout(Request $request)
+    {
+        Auth::guard('web')->logout();
+        $request->session()->invalidate();
+        $request->session()->regenerateToken();
+
+        return response()->json(['message' => 'Logged out']);
     }
 }
